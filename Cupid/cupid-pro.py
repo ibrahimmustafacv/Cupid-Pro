@@ -1,245 +1,280 @@
 #!/usr/bin/env python3
 """
 Cupid-Pro - Advanced Targeted Password List Generator
-Author: Your Name
-Description: Interactive tool to generate custom password lists based on target's information.
-Disclaimer: Use only on your own systems or with explicit written permission.
+Author: Ibrahim Mustafa
+Description: Generates a wordlist containing raw input strings + optional top 250 common passwords.
 """
 
-import itertools
+import sys
+import signal
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
-from rich.progress import track
 from rich import box
 import time
 
 console = Console()
 
-# الأسئلة حسب القسم
+ASCII_ART = """
+╔═══════════════════════════════════════════════════════════════╗
+║   ██████╗██╗   ██╗██████╗ ██╗██████╗      ██████╗██████╗  ██████╗ ║
+║  ██╔════╝██║   ██║██╔══██╗██║██╔══██╗    ██╔════╝██╔══██╗██╔═══██╗║
+║  ██║     ██║   ██║██████╔╝██║██████╔╝    ██║     ██████╔╝██║   ██║║
+║  ██║     ██║   ██║██╔═══╝ ██║██╔═══╝     ██║     ██╔══██╗██║   ██║║
+║  ╚██████╗╚██████╔╝██║     ██║██║         ╚██████╗██║  ██║╚██████╔╝║
+║   ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝          ╚═════╝╚═╝  ╚═╝ ╚═════╝ ║
+║                    Advanced Targeted Password Generator        ║
+║                           Cupid-Pro v3.4                       ║
+╚═══════════════════════════════════════════════════════════════╝
+"""
+
+def graceful_exit(signum, frame):
+    print("\n")
+    console.print("[bold yellow]👋 شكراً لاستخدامك الأداة[/bold yellow]")
+    console.print("[italic]تحياتي، Ibrahim Mustafa[/italic]")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, graceful_exit)
+
+# ========== الأسئلة الموسعة ==========
 QUESTIONS = {
     "Social Media": [
-        "Enter target's username (social media): ",
+        "Enter target's username: ",
         "Enter target's real name (First Last): ",
         "Enter target's birth year (YYYY): ",
-        "Enter target's favorite number: ",
+        "Enter target's full birth date (DDMMYYYY) (optional): ",
+        "Enter target's phone number: ",
         "Enter target's pet name: ",
-        "Enter target's favorite color: ",
         "Enter target's nickname: ",
-        "Enter target's relationship status (single/married/complicated): ",
+        "Enter partner's/spouse's name: ",
+        "Enter child's name (or multiple names separated by commas): ",
+        "Enter target's favorite hobby: ",
         "Enter target's favorite sports team: ",
         "Enter target's favorite singer/band: "
     ],
     "WiFi": [
-        "Enter target's router brand (e.g., TP-Link): ",
+        "Enter target's router brand: ",
         "Enter target's house number: ",
         "Enter target's street name: ",
-        "Enter target's phone number (without country code): ",
-        "Enter target's apartment number: ",
-        "Enter target's WiFi name (SSID) if known: ",
-        "Enter target's favorite TV show: ",
-        "Enter target's car model: ",
-        "Enter target's favorite food: ",
-        "Enter target's favorite holiday destination: "
+        "Enter target's phone number: ",
+        "Enter target's WiFi name (SSID): ",
+        "Enter target's favorite word: ",
+        "Enter target's car model (e.g., Toyota 2020): "
     ],
     "System": [
         "Enter target's computer username: ",
         "Enter target's company name: ",
-        "Enter target's employee ID: ",
         "Enter target's email address: ",
-        "Enter target's favorite programming language: ",
-        "Enter target's favorite OS (Windows/Linux/Mac): ",
-        "Enter target's favorite gaming platform: ",
-        "Enter target's favorite movie: ",
-        "Enter target's favorite book: ",
-        "Enter target's favorite quote: "
+        "Enter target's employee ID: ",
+        "Enter target's favorite number: ",
+        "Enter target's favorite word: ",
+        "Enter target's birthplace (city): ",
+        "Enter target's university/college name: ",
+        "Enter target's first school name: ",
+        "Enter target's important date (e.g., wedding, first job): ",
+        "Enter mother's maiden name: "
     ]
 }
 
-# أنماط شائعة لتوليد كلمات المرور (سيتم توسيعها ديناميكياً)
-BASE_PATTERNS = [
-    "{username}", "{username}{year}", "{year}{username}",
-    "{first}{last}", "{first}.{last}", "{first}_{last}", "{first}-{last}",
-    "{first}{year}", "{year}{first}", "{last}{year}",
-    "{pet}{year}", "{year}{pet}", "{pet}{username}",
-    "{color}{number}", "{number}{color}", "{street}{number}",
-    "{phone}", "{phone}{year}", "{wifiname}", "{wifiname}{number}",
-    "{company}{year}", "{email_local}", "{email_local}{year}",
-    "{username}123", "{username}123!", "{username}@{year}",
-    "P@ssw0rd{year}", "Admin{year}", "root{year}",
-    "{nickname}", "{nickname}{year}", "{team}{year}",
-    "{singer}{year}", "{movie}{year}", "{book}{year}",
+# قائمة بأكثر 250 كلمة مرور شيوعاً
+COMMON_PASSWORDS = [
+    "123456", "123456789", "admin", "12345678", "Aa123456", "12345", "password",
+    "123", "1234567890", "qwerty123", "qwerty", "Aa@123456", "Pass@123", "admin123",
+    "12345678910", "111111", "1234567891", "Welcome1", "abc123", "Password1", "qwerty1",
+    "abcd1234", "1q2w3e4r", "1qaz2wsx", "1234", "1234567", "123123", "123321", "letmein",
+    "iloveyou", "monkey", "dragon", "football", "sunshine", "princess", "master", "monday",
+    "freedom", "whatever", "demo", "root", "ubnt", "default", "changeme", "temp", "test",
+    "testing", "dummy", "office", "user123", "sample", "welcome123", "service", "deploy",
+    "admintelecom", "000000", "112233", "0987654321", "87654321", "987654321", "13579",
+    "147258", "11111111", "222222", "333333", "444444", "555555", "7777777", "777777",
+    "101010", "131313", "246810", "55555", "666666", "696969", "888888", "999999", "10101",
+    "123098", "bmw123", "ford", "secret", "mohamed", "ahmed", "mostafa", "ali", "omar",
+    "samir", "khaled", "heba", "nour", "mona", "mariam", "egypt", "cairo", "alex", "masr",
+    "masry", "quran", "islam", "allah", "bismillah", "love", "king", "queen", "hero",
+    "012345", "102030", "mido", "salah", "arsenal", "liverpool", "barcelona", "real madrid",
+    "chelsea", "manutd", "ronaldo", "messi", "snoopy", "flower", "bigbang", "harrypoter",
+    "sweetheart", "sweet", "prince", "passw0rd", "p@ssw0rd", "pass@123", "admin@123",
+    "administrator", "user", "guest", "welcome", "Aa123456", "1q2w3e", "abc123456",
+    "password123", "qwerty12345", "1234567q", "123456q", "12345q", "54321", "321654",
+    "159753", "753951", "852456", "951753", "159357", "aaaaaa", "bbbbbb", "abcdef", "abcde",
+    "abcd", "a123456", "a12345", "zaq12wsx", "qweasd", "qweasdzxc", "asdfghjk", "zxcvbnm",
+    "zxcvbn", "1qazzaq1", "1qazxsw2", "qazwsxedc", "zaq1xsw2", "1qaz@WSX", "1qaz!QAZ",
+    "pass123", "pass1234", "pass@1234", "Welcome@123", "Welcome1234", "admin@12345",
+    "Admin123456", "Aa12345678", "Aa123456789", "P@ssw0rd", "P@ssw0rd123", "P@55w0rd",
+    "p@55w0rd", "P@ssword", "password!", "Password123", "Password1234", "Password12345",
+    "Password@123", "Password@1234", "Admin@12345", "Admin12345", "admin12345",
+    "Admin@123456", "admin@123456", "Aa1234567", "Aa1234567890", "1qaz2wsx3edc",
+    "1qaz2wsx3edc4rfv", "qwertyuiop", "qwertyuiop123", "asdfghjkl", "zxcvbnm123",
+    "iloveyou123", "iloveyou1", "iloveyou!", "love123", "love1234", "loveyou", "sweet123",
+    "sweet1234", "princess1", "princess123", "dragon123", "dragon1", "monkey123", "monkey1",
+    "football123", "football1", "sunshine1", "sunshine123", "master1", "master123", "monday1",
+    "monday123", "freedom1", "freedom123", "whatever1", "whatever123", "letmein123", "letmein1",
+    "test1234", "test1", "temp123", "demo123", "changeme123", "default123", "root123",
+    "ubnt123", "guest123", "user1234", "office123", "service123", "deploy123", "sample123",
+    "company123", "business123", "school123", "college123", "university123", "student123",
+    "teacher123", "doctor123", "engineer123", "lawyer123", "music123", "movie123", "book123",
+    "game123", "gaming123", "playstation123", "xbox123", "nintendo123", "computer123",
+    "laptop123", "phone123", "mobile123", "iphone123", "samsung123", "huawei123", "oppo123",
+    "vivo123", "realme123", "xiaomi123", "oneplus123", "google123", "facebook123",
+    "instagram123", "twitter123", "whatsapp123", "youtube123", "tiktok123", "snapchat123",
+    "telegram123", "discord123", "reddit123", "linkedin123", "netflix123", "spotify123",
+    "amazon123", "ebay123", "paypal123", "apple123", "microsoft123", "windows123", "linux123",
+    "ubuntu123", "centos123", "debian123", "fedora123", "kali123", "parrot123", "black123",
+    "white123", "red123", "blue123", "green123", "yellow123", "orange123", "purple123",
+    "pink123", "brown123", "grey123", "gray123", "silver123", "gold123", "copper123",
+    "bronze123", "steel123", "iron123", "metal123", "wood123", "stone123", "fire123",
+    "water123", "earth123", "air123", "sky123", "star123", "moon123", "sun123", "planet123",
+    "galaxy123", "universe123", "cosmos123", "space123", "rocket123", "astronaut123",
+    "alien123", "robot123", "cyber123", "hacker123", "security123", "privacy123", "encrypt123",
+    "decrypt123", "crypto123", "bitcoin123", "ethereum123", "blockchain123", "wallet123",
+    "password1234", "password12345", "password123456", "password1234567", "password12345678",
+    "password123456789", "password1234567890", "123456password", "12345678password",
+    "qwertypassword", "abcdpassword", "adminpassword", "userpassword", "rootpassword", "toor",
+    "toor123", "toor1234", "toor12345", "toor123456", "toor1234567", "toor12345678",
+    "toor123456789", "toor1234567890"
 ]
 
 def collect_info(attack_type):
-    """جمع المعلومات بناءً على نوع الهجوم."""
     info = {}
-    questions = QUESTIONS.get(attack_type, [])
+    questions = []
     if attack_type == "Mix All":
-        # جمع جميع الأسئلة من كل الأقسام
-        all_questions = []
         for qlist in QUESTIONS.values():
-            all_questions.extend(qlist)
-        questions = all_questions
-
+            questions.extend(qlist)
+    else:
+        questions = QUESTIONS.get(attack_type, [])
+    
     console.print(Panel(f"[bold cyan]{attack_type} Information Gathering[/bold cyan]", box=box.ROUNDED))
-    for q in questions:
-        answer = Prompt.ask(q, default="")
-        if answer.strip() and answer.lower() not in ["no", "skip", ""]:
-            key = q.lower().replace(" ", "_").replace("(", "").replace(")", "").replace("?", "")
-            info[key] = answer.strip()
+    try:
+        for q in questions:
+            answer = Prompt.ask(q, default="")
+            if answer.strip() and answer.lower() not in ["no", "skip", ""]:
+                if "child's name" in q.lower() and "," in answer:
+                    children = [c.strip() for c in answer.split(",")]
+                    for i, child in enumerate(children):
+                        info[f"child_{i+1}_name"] = child
+                else:
+                    key = q.lower().replace(" ", "_").replace("(", "").replace(")", "").replace("?", "")
+                    info[key] = answer.strip()
+    except KeyboardInterrupt:
+        graceful_exit(None, None)
     return info
 
-def extract_names(info):
-    """استخراج الأسماء من المعلومات المجمعة."""
-    names = []
+def extract_raw_data(info):
+    """استخراج القيم النصية فقط (بدون تصنيف أرقام أو تواريخ)"""
+    raw = set()
+    
     for key, value in info.items():
-        if "name" in key or "username" in key or "nickname" in key:
-            names.append(value)
-        # استخراج الاسم الأول والأخير من "real name"
-        if "real_name" in key:
+        # إضافة القيمة نفسها
+        if len(value) >= 2:
+            raw.add(value)
+            raw.add(value.lower())
+            raw.add(value.upper())
+            raw.add(value.capitalize())
+            # إذا كانت القيمة تتكون من عدة كلمات أضف كل كلمة بمفردها
             parts = value.split()
-            if len(parts) >= 1:
-                names.append(parts[0])
-            if len(parts) >= 2:
-                names.append(parts[-1])
-    # إضافة كلمات من حقول أخرى قد تحتوي على أسماء
-    for key in ["pet", "wife", "color", "team", "singer", "movie", "book"]:
-        if key in info:
-            names.append(info[key])
-    return list(set(names))
-
-def extract_years(info):
-    """استخراج السنوات من المعلومات."""
-    years = []
-    for key, value in info.items():
-        if "year" in key and value.isdigit():
-            years.append(value)
-        # استخراج سنة من البريد الإلكتروني (إن وجدت)
+            for part in parts:
+                if len(part) >= 2:
+                    raw.add(part)
+                    raw.add(part.lower())
+                    raw.add(part.upper())
+                    raw.add(part.capitalize())
+        
+        # معالجة خاصة للبريد الإلكتروني: أضف الجزء قبل @
         if "email" in key and "@" in value:
-            local = value.split('@')[0]
-            for part in local.split('.'):
-                if part.isdigit() and len(part) in [2,4]:
-                    years.append(part)
-    return list(set(years))
+            email_local = value.split('@')[0]
+            if len(email_local) >= 2:
+                raw.add(email_local)
+                raw.add(email_local.lower())
+                raw.add(email_local.upper())
+                raw.add(email_local.capitalize())
+    
+    # أسماء الأبناء (child_X_name)
+    for key, val in info.items():
+        if key.startswith("child_"):
+            if len(val) >= 2:
+                raw.add(val)
+                raw.add(val.lower())
+                raw.add(val.upper())
+                raw.add(val.capitalize())
+                parts = val.split()
+                for part in parts:
+                    if len(part) >= 2:
+                        raw.add(part)
+                        raw.add(part.lower())
+                        raw.add(part.upper())
+                        raw.add(part.capitalize())
+    
+    return list(raw)
 
-def extract_numbers(info):
-    """استخراج الأرقام من المعلومات (هاتف، رقم المنزل، إلخ)."""
-    numbers = []
-    for key, value in info.items():
-        if "number" in key or "phone" in key:
-            numbers.append(value)
-        # استخراج أرقام من أي حقل
-        for word in value.split():
-            if word.isdigit():
-                numbers.append(word)
-    return list(set(numbers))
+def generate_wordlist(raw_words, add_common_passwords):
+    """توليد قائمة كلمات المرور: المدخلات الخام + اختيارياً قائمة الأكثر شيوعاً"""
+    wordlist = set(raw_words)
+    if add_common_passwords:
+        wordlist.update(COMMON_PASSWORDS)
+    return sorted(wordlist)
 
-def generate_passwords(info, attack_type):
-    """توليد كلمات المرور بناءً على المعلومات المجمعة."""
-    passwords = set()
-    names = extract_names(info)
-    years = extract_years(info)
-    numbers = extract_numbers(info)
-    
-    # إضافة الكلمات المباشرة
-    for name in names:
-        if len(name) >= 4:
-            passwords.add(name)
-            passwords.add(name.lower())
-            passwords.add(name.upper())
-            passwords.add(name.capitalize())
-    
-    # توليد باستخدام الأنماط
-    for pattern in BASE_PATTERNS:
-        try:
-            # تجربة كل اسم مع كل سنة وكل رقم
-            for name in names:
-                for year in years:
-                    pwd = pattern.format(username=name, year=year, first=name, last=name,
-                                         pet=info.get('pet_name', ''), color=info.get('favorite_color', ''),
-                                         number=numbers[0] if numbers else '', street=info.get('street_name', ''),
-                                         phone=info.get('phone_number', ''), wifiname=info.get('wifi_name', ''),
-                                         company=info.get('company_name', ''), email_local=info.get('email_address', '').split('@')[0] if 'email_address' in info else '',
-                                         nickname=info.get('nickname', ''), team=info.get('favorite_sports_team', ''),
-                                         singer=info.get('favorite_singer/band', ''), movie=info.get('favorite_movie', ''),
-                                         book=info.get('favorite_book', ''))
-                    if len(pwd) >= 8:
-                        passwords.add(pwd)
-        except Exception:
-            pass
-    
-    # توليد تركيبات إضافية (الاسم + الرقم، الرقم + الاسم)
-    for name in names:
-        for num in numbers:
-            if len(name + num) >= 8:
-                passwords.add(name + num)
-                passwords.add(num + name)
-                passwords.add(name + "@" + num)
-                passwords.add(name + "_" + num)
-                passwords.add(name + num + "!")
-    
-    # إضافة تواريخ الميلاد المحتملة (DDMMYYYY)
-    for year in years:
-        if len(year) == 4:
-            for month in range(1,13):
-                for day in range(1,32):
-                    date = f"{day:02d}{month:02d}{year}"
-                    if len(date) >= 8:
-                        passwords.add(date)
-    
-    return sorted(passwords)
-
-def display_passwords(passwords, limit=30):
-    """عرض كلمات المرور في جدول جميل."""
-    table = Table(title=f"[bold green]Generated Passwords (Total: {len(passwords)})[/bold green]", box=box.ROUNDED)
+def display_passwords(passwords, limit=40):
+    table = Table(title=f"[bold green]Generated Wordlist (Total: {len(passwords)})[/bold green]", box=box.ROUNDED)
     table.add_column("#", style="cyan", no_wrap=True)
-    table.add_column("Password", style="yellow")
+    table.add_column("Word", style="yellow")
     for i, pwd in enumerate(passwords[:limit], start=1):
         table.add_row(str(i), pwd)
     if len(passwords) > limit:
         console.print(f"\n[italic]... and {len(passwords) - limit} more.[/italic]")
     console.print(table)
 
-def save_to_file(passwords, filename):
-    """حفظ كلمات المرور في ملف."""
+def save_to_file(words, filename):
     with open(filename, 'w') as f:
-        f.write("\n".join(passwords))
-    console.print(f"[bold green]✓ Saved {len(passwords)} passwords to {filename}[/bold green]")
+        f.write("\n".join(words))
+    console.print(f"[bold green]✓ Saved {len(words)} words to {filename}[/bold green]")
 
 def main():
     console.clear()
-    console.print(Panel.fit("[bold red]Cupid-Pro[/bold red]\n[italic]Advanced Targeted Password Generator[/italic]", border_style="cyan"))
+    console.print(ASCII_ART, style="bold cyan")
+    console.print("[italic yellow]⚠️  Use only for authorized security testing on your own systems.[/italic yellow]\n")
     
-    # اختيار نوع الهجوم
-    attack_type = Prompt.ask("[bold yellow]Select attack type[/bold yellow]", choices=["Social Media", "WiFi", "System", "Mix All"], default="Social Media")
+    console.print("[bold yellow]Select attack type:[/bold yellow]")
+    console.print("  1. Social Media")
+    console.print("  2. WiFi")
+    console.print("  3. System")
+    console.print("  4. Mix All (combine all questions)\n")
     
-    # جمع المعلومات
+    try:
+        choice = Prompt.ask("[bold cyan]Enter your choice[/bold cyan]", choices=["1", "2", "3", "4"], default="1")
+    except KeyboardInterrupt:
+        graceful_exit(None, None)
+        return
+    
+    attack_type_map = {"1": "Social Media", "2": "WiFi", "3": "System", "4": "Mix All"}
+    attack_type = attack_type_map[choice]
+    
     info = collect_info(attack_type)
-    
     if not info:
         console.print("[bold red]No information provided. Exiting...[/bold red]")
         return
     
     console.print(f"\n[green]✓ Collected {len(info)} pieces of information.[/green]")
     
-    # توليد كلمات المرور
-    with console.status("[bold cyan]Generating passwords...[/bold cyan]"):
-        time.sleep(1)
-        passwords = generate_passwords(info, attack_type)
+    # سؤال المستخدم حول إضافة القائمة الشائعة
+    add_common = Confirm.ask("[yellow]Do you want to add the top 250 most common passwords to the wordlist?[/yellow]", default=False)
     
-    if not passwords:
-        console.print("[bold red]No passwords generated. Try providing more information or adjusting patterns.[/bold red]")
+    raw_words = extract_raw_data(info)
+    wordlist = generate_wordlist(raw_words, add_common)
+    
+    if not wordlist:
+        console.print("[bold red]No words generated.[/bold red]")
         return
     
-    # عرض النتائج
-    display_passwords(passwords)
+    display_passwords(wordlist)
     
-    # حفظ في ملف
-    if Confirm.ask("[yellow]Save passwords to file?[/yellow]"):
-        filename = Prompt.ask("Enter filename", default="cupid_output.txt")
-        save_to_file(passwords, filename)
+    try:
+        if Confirm.ask("[yellow]Save wordlist to file?[/yellow]"):
+            filename = Prompt.ask("Enter filename", default="cupid_output.txt")
+            save_to_file(wordlist, filename)
+    except KeyboardInterrupt:
+        graceful_exit(None, None)
+        return
     
     console.print("\n[bold green]Done. Stay ethical![/bold green]")
 
