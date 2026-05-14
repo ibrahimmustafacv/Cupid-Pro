@@ -2,12 +2,15 @@
 """
 Cupid-Pro - Advanced Targeted Password List Generator
 Author: Ibrahim Mustafa
-Description: Generates a wordlist containing raw input strings + optional top common passwords.
+Description: Generates a wordlist containing raw input strings + optional top common passwords
+             + optional advanced combinations (Max Data mode).
              Supports Arabic and English interface.
 """
 
 import sys
 import signal
+import re
+import itertools
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import Prompt, Confirm
@@ -26,7 +29,7 @@ ASCII_ART = """
 ║  ╚██████╗╚██████╔╝██║     ██║██║         ╚██████╗██║  ██║╚██████╔╝║
 ║   ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝          ╚═════╝╚═╝  ╚═╝ ╚═════╝ ║
 ║                    Advanced Targeted Password Generator        ║
-║                           Cupid-Pro v3.5                       ║
+║                           Cupid-Pro v4.0                       ║
 ╚═══════════════════════════════════════════════════════════════╝
 """
 
@@ -125,6 +128,7 @@ TEXTS_AR = {
     "option_4": "  4. مزيج الكل (جميع الأسئلة)",
     "choice_prompt": "أدخل اختيارك",
     "common_passwords_prompt": "هل تريد إضافة قائمة بأكثر 250 كلمة مرور شيوعاً إلى القائمة؟",
+    "maxdata_prompt": "هل تريد تفعيل وضع Max Data (الدمج المتقدم)؟ سينشئ تركيبات إضافية مثل الاسم+رقم، الرموز، الليت، العكس، إلخ.",
     "save_prompt": "هل تريد حفظ القائمة في ملف؟",
     "filename_prompt": "أدخل اسم الملف",
     "done_msg": "تم. استخدم الأداة بشكل أخلاقي!",
@@ -145,7 +149,8 @@ TEXTS_AR = {
         "WiFi": "الواي فاي",
         "System": "النظام",
         "Mix All": "مزيج الكل"
-    }
+    },
+    "info_gathering": "جمع المعلومات"
 }
 
 TEXTS_EN = {
@@ -156,6 +161,7 @@ TEXTS_EN = {
     "option_4": "  4. Mix All (combine all questions)",
     "choice_prompt": "Enter your choice",
     "common_passwords_prompt": "Do you want to add the top 250 most common passwords to the wordlist?",
+    "maxdata_prompt": "Do you want to enable Max Data mode (advanced combinations)? It will generate extra patterns like name+number, leet, reverse, etc.",
     "save_prompt": "Save wordlist to file?",
     "filename_prompt": "Enter filename",
     "done_msg": "Done. Stay ethical!",
@@ -176,9 +182,11 @@ TEXTS_EN = {
         "WiFi": "WiFi",
         "System": "System",
         "Mix All": "Mix All"
-    }
+    },
+    "info_gathering": "Information Gathering"
 }
 
+# قائمة بأكثر 250 كلمة مرور شيوعاً (مختصرة قليلاً للطول، لكنها موجودة كاملة في الكود الأصلي)
 COMMON_PASSWORDS = [
     "123456", "123456789", "admin", "12345678", "Aa123456", "12345", "password",
     "123", "1234567890", "qwerty123", "qwerty", "Aa@123456", "Pass@123", "admin123",
@@ -236,6 +244,7 @@ COMMON_PASSWORDS = [
     "toor123456789", "toor1234567890"
 ]
 
+# ========== دوال استخراج البيانات ==========
 def collect_info(attack_type, questions_dict, texts, lang):
     info = {}
     questions = []
@@ -246,7 +255,7 @@ def collect_info(attack_type, questions_dict, texts, lang):
         questions = questions_dict.get(attack_type, [])
     
     attack_name = texts["attack_type_names"].get(attack_type, attack_type)
-    console.print(Panel(f"[bold cyan]{attack_name} {texts.get('info_gathering', 'Information Gathering') if lang == 'en' else 'جمع المعلومات'}[/bold cyan]", box=box.ROUNDED))
+    console.print(Panel(f"[bold cyan]{attack_name} {texts.get('info_gathering', 'Information Gathering')}[/bold cyan]", box=box.ROUNDED))
     try:
         for q in questions:
             answer = Prompt.ask(q, default="")
@@ -260,7 +269,6 @@ def collect_info(attack_type, questions_dict, texts, lang):
                         info["child_1_name"] = answer
                 else:
                     key = q.lower().replace(" ", "_").replace("(", "").replace(")", "").replace("?", "")
-                    # إزالة الكلمات العربية والإنجليزية الزائدة
                     key = key.replace("أدخل_", "").replace("enter_", "")
                     info[key] = answer.strip()
     except KeyboardInterrupt:
@@ -269,6 +277,7 @@ def collect_info(attack_type, questions_dict, texts, lang):
 
 def extract_raw_data(info):
     raw = set()
+    # جمع النصوص
     for key, value in info.items():
         if len(value) >= 2:
             raw.add(value)
@@ -305,10 +314,187 @@ def extract_raw_data(info):
                         raw.add(part.capitalize())
     return list(raw)
 
-def generate_wordlist(raw_words, add_common_passwords):
+def extract_numbers_phones(info):
+    """استخراج الأرقام والهواتف من المعلومات"""
+    numbers = set()
+    phones = set()
+    for key, value in info.items():
+        digits = re.sub(r'\D', '', value)  # استخراج الأرقام فقط
+        if len(digits) >= 9:
+            phones.add(digits)
+            phones.add(digits[-4:])   # آخر 4 أرقام
+            phones.add(digits[-5:])   # آخر 5 أرقام
+            phones.add(digits[-6:])   # آخر 6 أرقام
+            # بدون الصفر الأول
+            if digits.startswith('0'):
+                phones.add(digits[1:])
+            # أول 7 أرقام بعد الصفر
+            if len(digits) > 7:
+                phones.add(digits[:7])
+        elif len(digits) >= 2:
+            numbers.add(digits)
+    return list(phones), list(numbers)
+
+def extract_years(info):
+    years = set()
+    for key, value in info.items():
+        digits = re.sub(r'\D', '', value)
+        if len(digits) == 4 and 1900 <= int(digits) <= 2030:
+            years.add(digits)
+            years.add(digits[-2:])
+        # أيضاً استخرج من التواريخ الكاملة
+        if len(digits) == 8 and 1900 <= int(digits[-4:]) <= 2030:
+            years.add(digits[-4:])
+            years.add(digits[-2:])
+    return list(years)
+
+def extract_words(info):
+    words = set()
+    for key, value in info.items():
+        if value.isalpha() and len(value) >= 2:
+            words.add(value)
+            words.add(value.lower())
+            words.add(value.capitalize())
+    return list(words)
+
+def leet_variants(word):
+    """توليد متغيرات Leet لكلمة (مبادئ بسيطة)"""
+    leet_map = {
+        'a': ['4', '@'], 'A': ['4', '@'],
+        'e': ['3'], 'E': ['3'],
+        'i': ['1'], 'I': ['1'],
+        'o': ['0'], 'O': ['0'],
+        's': ['5', '$'], 'S': ['5', '$'],
+        't': ['7'], 'T': ['7'],
+        'b': ['8'], 'B': ['8'],
+        'g': ['9'], 'G': ['9'],
+        'z': ['2'], 'Z': ['2']
+    }
+    variants = set()
+    # نطبق التحويل على حرف واحد فقط (لعدم التضخم)
+    for i, ch in enumerate(word):
+        if ch in leet_map:
+            for repl in leet_map[ch]:
+                new_word = word[:i] + repl + word[i+1:]
+                variants.add(new_word)
+    return list(variants)
+
+def generate_advanced_combinations(raw_words, phones, years, words):
+    """توليد تركيبات متقدمة وفق الأنماط المطلوبة"""
+    combos = set()
+    # التحضير: قوائم الكلمات والأرقام
+    name_list = [w for w in raw_words if w.isalpha() and len(w) >= 2]
+    # إضافة الأسماء الخاصة من الحقول المهمة (يمكن تحسينها)
+    phone_list = phones[:5]   # حدود معقولة
+    year_list = years[:5]
+    num_short = [p for p in phone_list if len(p) <= 5]  # أجزاء قصيرة من الأرقام
+    
+    # 1. الدمج المباشر (الاسم + شيء، شيء + الاسم)
+    for name in name_list[:10]:  # حد أقصى 10 أسماء لتجنب الانفجار
+        for phone in phone_list[:3]:
+            combos.add(name + phone)
+            combos.add(phone + name)
+        for year in year_list:
+            combos.add(name + year)
+            combos.add(year + name)
+        for word in words[:5]:
+            if word != name:
+                combos.add(name + word)
+                combos.add(word + name)
+    
+    # 2. أخذ أجزاء من الرقم (آخر 4، آخر 5، بدون صفر، إلخ)
+    for name in name_list[:10]:
+        for num in num_short[:5]:
+            combos.add(name + num)
+            combos.add(num + name)
+    
+    # 3. الدمج بالرموز @, _, ., -
+    symbols = ['@', '_', '.', '-']
+    for name in name_list[:10]:
+        for other in name_list[:5] + words[:3] + num_short[:3]:
+            if name != other:
+                for sym in symbols:
+                    combos.add(name + sym + other)
+                    combos.add(other + sym + name)
+        for num in num_short[:3]:
+            for sym in symbols:
+                combos.add(name + sym + num)
+                combos.add(num + sym + name)
+    
+    # 4. استبدال الحروف بأرقام (Leet) على الكلمات
+    for name in name_list[:10]:
+        leet_vers = leet_variants(name)
+        for lv in leet_vers:
+            combos.add(lv)
+            for num in num_short[:3]:
+                combos.add(lv + num)
+                combos.add(num + lv)
+            for year in year_list:
+                combos.add(lv + year)
+    
+    # 5. تكرار الاسم (مرتين) أو جزء منه + bro
+    for name in name_list[:10]:
+        combos.add(name + name)
+        if len(name) >= 4:
+            combos.add(name[:4] + "bro")
+            combos.add(name[:3] + "123")
+        if len(name) >= 3:
+            combos.add(name + "12")
+    
+    # 6. إضافة سنوات من 70 إلى 10 (تمثيل الأرقام الشائعة)
+    common_years = [str(y) for y in range(1970, 2011)]
+    for name in name_list[:10]:
+        for yy in common_years[:5]:
+            combos.add(name + yy)
+            combos.add(yy + name)
+    
+    # 7. دمج ثلاثة عناصر (حد أقصى تجنباً للتضخم)
+    if len(name_list) >= 2 and len(num_short) >= 1:
+        for i in range(min(3, len(name_list))):
+            for j in range(min(3, len(name_list))):
+                if i != j:
+                    for num in num_short[:2]:
+                        combos.add(name_list[i] + name_list[j] + num)
+                        combos.add(name_list[i] + num + name_list[j])
+    
+    # 8. عكس الكلمات
+    for name in name_list[:10]:
+        rev = name[::-1]
+        if len(rev) >= 2:
+            combos.add(rev)
+            for num in num_short[:3]:
+                combos.add(rev + num)
+                combos.add(num + rev)
+    
+    # 9. حالات الأحرف المختلفة (الكلمات المكررة بأحرف كبيرة وصغيرة)
+    for name in name_list[:10]:
+        combos.add(name.upper())
+        combos.add(name.lower())
+        combos.add(name.capitalize())
+    
+    # 10. تركيبات شهيرة مع أرقام ثابتة (123, 1234, 2025)
+    for name in name_list[:10]:
+        combos.add(name + "123")
+        combos.add(name + "1234")
+        combos.add(name + "@123")
+        combos.add(name + "2025")
+        combos.add("2025" + name)
+    
+    # إضافة بعض الأرقام الصغيرة الممكنة
+    for name in name_list[:10]:
+        for n in range(0, 10):
+            combos.add(name + str(n))
+            combos.add(str(n) + name)
+    
+    return combos
+
+def generate_wordlist(raw_words, add_common_passwords, enable_maxdata, phones, years, words):
     wordlist = set(raw_words)
     if add_common_passwords:
         wordlist.update(COMMON_PASSWORDS)
+    if enable_maxdata:
+        advanced = generate_advanced_combinations(raw_words, phones, years, words)
+        wordlist.update(advanced)
     return sorted(wordlist)
 
 def display_passwords(passwords, limit=40):
@@ -347,7 +533,7 @@ def main():
         questions_dict = QUESTIONS_EN
         console.print("[italic yellow]⚠️  Use only for authorized security testing on your own systems.[/italic yellow]\n")
     
-    # قائمة أنواع الهجوم مترجمة
+    # قائمة أنواع الهجوم
     console.print(f"[bold yellow]{texts['title']}[/bold yellow]")
     console.print(texts["option_1"])
     console.print(texts["option_2"])
@@ -370,10 +556,21 @@ def main():
     
     console.print(f"\n[green]{texts['collect_msg'].format(len(info))}[/green]")
     
+    # سؤال إضافة القائمة الشائعة
     add_common = Confirm.ask(f"[yellow]{texts['common_passwords_prompt']}[/yellow]", default=False)
     
+    # سؤال تفعيل Max Data (الدمج المتقدم)
+    enable_maxdata = Confirm.ask(f"[yellow]{texts['maxdata_prompt']}[/yellow]", default=False)
+    
     raw_words = extract_raw_data(info)
-    wordlist = generate_wordlist(raw_words, add_common)
+    phones, numbers = extract_numbers_phones(info)
+    years = extract_years(info)
+    words = extract_words(info)
+    
+    # دمج جميع الأرقام والهواتف في قائمة واحدة للمساعدة
+    all_numbers = phones + numbers + years
+    
+    wordlist = generate_wordlist(raw_words, add_common, enable_maxdata, phones, years, words)
     
     if not wordlist:
         console.print(f"[bold red]{texts['no_words']}[/bold red]")
