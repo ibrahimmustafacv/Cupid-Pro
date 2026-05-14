@@ -2,7 +2,8 @@
 """
 Cupid-Pro - Advanced Targeted Password List Generator
 Author: Ibrahim Mustafa
-Description: Generates a wordlist containing raw input strings + optional top 250 common passwords.
+Description: Generates a wordlist containing raw input strings + optional top common passwords.
+             Supports Arabic and English interface.
 """
 
 import sys
@@ -25,7 +26,7 @@ ASCII_ART = """
 ║  ╚██████╗╚██████╔╝██║     ██║██║         ╚██████╗██║  ██║╚██████╔╝║
 ║   ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝          ╚═════╝╚═╝  ╚═╝ ╚═════╝ ║
 ║                    Advanced Targeted Password Generator        ║
-║                           Cupid-Pro v3.4                       ║
+║                           Cupid-Pro v3.5                       ║
 ╚═══════════════════════════════════════════════════════════════╝
 """
 
@@ -37,8 +38,47 @@ def graceful_exit(signum, frame):
 
 signal.signal(signal.SIGINT, graceful_exit)
 
-# ========== الأسئلة الموسعة ==========
-QUESTIONS = {
+# ========== قوائم الأسئلة (عربي / إنجليزي) ==========
+QUESTIONS_AR = {
+    "Social Media": [
+        "أدخل اسم المستخدم: ",
+        "أدخل الاسم الكامل (الأول والأخير): ",
+        "أدخل سنة الميلاد (YYYY): ",
+        "أدخل تاريخ الميلاد الكامل (DDMMYYYY) (اختياري): ",
+        "أدخل رقم الهاتف: ",
+        "أدخل اسم الحيوان الأليف: ",
+        "أدخل اللقب: ",
+        "أدخل اسم الزوج/الزوجة: ",
+        "أدخل اسم الابن/الابنة (أو عدة أسماء مفصولة بفواصل): ",
+        "أدخل الهواية المفضلة: ",
+        "أدخل الفريق الرياضي المفضل: ",
+        "أدخل المطرب/الفرقة الموسيقية المفضلة: "
+    ],
+    "WiFi": [
+        "أدخل ماركة الراوتر: ",
+        "أدخل رقم المنزل: ",
+        "أدخل اسم الشارع: ",
+        "أدخل رقم الهاتف: ",
+        "أدخل اسم شبكة الواي فاي (SSID): ",
+        "أدخل الكلمة المفضلة: ",
+        "أدخل موديل السيارة (مثل تويوتا 2020): "
+    ],
+    "System": [
+        "أدخل اسم مستخدم الكمبيوتر: ",
+        "أدخل اسم الشركة: ",
+        "أدخل البريد الإلكتروني: ",
+        "أدخل رقم الموظف: ",
+        "أدخل الرقم المفضل: ",
+        "أدخل الكلمة المفضلة: ",
+        "أدخل مدينة الميلاد: ",
+        "أدخل اسم الجامعة/الكلية: ",
+        "أدخل اسم المدرسة الأولى: ",
+        "أدخل تاريخ مهم (مثل الزواج، أول وظيفة): ",
+        "أدخل اسم الأم قبل الزواج: "
+    ]
+}
+
+QUESTIONS_EN = {
     "Social Media": [
         "Enter target's username: ",
         "Enter target's real name (First Last): ",
@@ -77,7 +117,68 @@ QUESTIONS = {
     ]
 }
 
-# قائمة بأكثر 250 كلمة مرور شيوعاً
+TEXTS_AR = {
+    "title": "اختر نوع الهجوم:",
+    "option_1": "  1. وسائل التواصل الاجتماعي",
+    "option_2": "  2. الواي فاي",
+    "option_3": "  3. النظام (كمبيوتر/عمل)",
+    "option_4": "  4. مزيج الكل (جميع الأسئلة)",
+    "choice_prompt": "أدخل اختيارك",
+    "common_passwords_prompt": "هل تريد إضافة قائمة بأكثر 250 كلمة مرور شيوعاً إلى القائمة؟",
+    "save_prompt": "هل تريد حفظ القائمة في ملف؟",
+    "filename_prompt": "أدخل اسم الملف",
+    "done_msg": "تم. استخدم الأداة بشكل أخلاقي!",
+    "no_info_msg": "لم يتم تقديم أي معلومات. إلغاء...",
+    "collect_msg": "✓ تم جمع {} معلومة.",
+    "saved_msg": "✓ تم حفظ {} كلمة في {}",
+    "generating": "جاري توليد الكلمات...",
+    "no_words": "لم يتم توليد أي كلمات.",
+    "exiting": "خروج...",
+    "exit_msg": "👋 شكراً لاستخدامك الأداة",
+    "thanks_msg": "تحياتي، Ibrahim Mustafa",
+    "language_prompt": "اختر اللغة / Choose Language:",
+    "lang_ar": "  1. العربية",
+    "lang_en": "  2. English",
+    "lang_choice": "Enter your choice / أدخل اختيارك",
+    "attack_type_names": {
+        "Social Media": "وسائل التواصل الاجتماعي",
+        "WiFi": "الواي فاي",
+        "System": "النظام",
+        "Mix All": "مزيج الكل"
+    }
+}
+
+TEXTS_EN = {
+    "title": "Select attack type:",
+    "option_1": "  1. Social Media",
+    "option_2": "  2. WiFi",
+    "option_3": "  3. System",
+    "option_4": "  4. Mix All (combine all questions)",
+    "choice_prompt": "Enter your choice",
+    "common_passwords_prompt": "Do you want to add the top 250 most common passwords to the wordlist?",
+    "save_prompt": "Save wordlist to file?",
+    "filename_prompt": "Enter filename",
+    "done_msg": "Done. Stay ethical!",
+    "no_info_msg": "No information provided. Exiting...",
+    "collect_msg": "✓ Collected {} pieces of information.",
+    "saved_msg": "✓ Saved {} words to {}",
+    "generating": "Generating words...",
+    "no_words": "No words generated.",
+    "exiting": "Exiting...",
+    "exit_msg": "👋 Thank you for using the tool",
+    "thanks_msg": "Regards, Ibrahim Mustafa",
+    "language_prompt": "اختر اللغة / Choose Language:",
+    "lang_ar": "  1. العربية",
+    "lang_en": "  2. English",
+    "lang_choice": "Enter your choice / أدخل اختيارك",
+    "attack_type_names": {
+        "Social Media": "Social Media",
+        "WiFi": "WiFi",
+        "System": "System",
+        "Mix All": "Mix All"
+    }
+}
+
 COMMON_PASSWORDS = [
     "123456", "123456789", "admin", "12345678", "Aa123456", "12345", "password",
     "123", "1234567890", "qwerty123", "qwerty", "Aa@123456", "Pass@123", "admin123",
@@ -135,43 +236,45 @@ COMMON_PASSWORDS = [
     "toor123456789", "toor1234567890"
 ]
 
-def collect_info(attack_type):
+def collect_info(attack_type, questions_dict, texts, lang):
     info = {}
     questions = []
     if attack_type == "Mix All":
-        for qlist in QUESTIONS.values():
+        for qlist in questions_dict.values():
             questions.extend(qlist)
     else:
-        questions = QUESTIONS.get(attack_type, [])
+        questions = questions_dict.get(attack_type, [])
     
-    console.print(Panel(f"[bold cyan]{attack_type} Information Gathering[/bold cyan]", box=box.ROUNDED))
+    attack_name = texts["attack_type_names"].get(attack_type, attack_type)
+    console.print(Panel(f"[bold cyan]{attack_name} {texts.get('info_gathering', 'Information Gathering') if lang == 'en' else 'جمع المعلومات'}[/bold cyan]", box=box.ROUNDED))
     try:
         for q in questions:
             answer = Prompt.ask(q, default="")
             if answer.strip() and answer.lower() not in ["no", "skip", ""]:
-                if "child's name" in q.lower() and "," in answer:
-                    children = [c.strip() for c in answer.split(",")]
-                    for i, child in enumerate(children):
-                        info[f"child_{i+1}_name"] = child
+                if "child's name" in q.lower() or "اسم الابن" in q.lower():
+                    if "," in answer:
+                        children = [c.strip() for c in answer.split(",")]
+                        for i, child in enumerate(children):
+                            info[f"child_{i+1}_name"] = child
+                    else:
+                        info["child_1_name"] = answer
                 else:
                     key = q.lower().replace(" ", "_").replace("(", "").replace(")", "").replace("?", "")
+                    # إزالة الكلمات العربية والإنجليزية الزائدة
+                    key = key.replace("أدخل_", "").replace("enter_", "")
                     info[key] = answer.strip()
     except KeyboardInterrupt:
         graceful_exit(None, None)
     return info
 
 def extract_raw_data(info):
-    """استخراج القيم النصية فقط (بدون تصنيف أرقام أو تواريخ)"""
     raw = set()
-    
     for key, value in info.items():
-        # إضافة القيمة نفسها
         if len(value) >= 2:
             raw.add(value)
             raw.add(value.lower())
             raw.add(value.upper())
             raw.add(value.capitalize())
-            # إذا كانت القيمة تتكون من عدة كلمات أضف كل كلمة بمفردها
             parts = value.split()
             for part in parts:
                 if len(part) >= 2:
@@ -179,8 +282,6 @@ def extract_raw_data(info):
                     raw.add(part.lower())
                     raw.add(part.upper())
                     raw.add(part.capitalize())
-        
-        # معالجة خاصة للبريد الإلكتروني: أضف الجزء قبل @
         if "email" in key and "@" in value:
             email_local = value.split('@')[0]
             if len(email_local) >= 2:
@@ -188,8 +289,6 @@ def extract_raw_data(info):
                 raw.add(email_local.lower())
                 raw.add(email_local.upper())
                 raw.add(email_local.capitalize())
-    
-    # أسماء الأبناء (child_X_name)
     for key, val in info.items():
         if key.startswith("child_"):
             if len(val) >= 2:
@@ -204,11 +303,9 @@ def extract_raw_data(info):
                         raw.add(part.lower())
                         raw.add(part.upper())
                         raw.add(part.capitalize())
-    
     return list(raw)
 
 def generate_wordlist(raw_words, add_common_passwords):
-    """توليد قائمة كلمات المرور: المدخلات الخام + اختيارياً قائمة الأكثر شيوعاً"""
     wordlist = set(raw_words)
     if add_common_passwords:
         wordlist.update(COMMON_PASSWORDS)
@@ -224,24 +321,41 @@ def display_passwords(passwords, limit=40):
         console.print(f"\n[italic]... and {len(passwords) - limit} more.[/italic]")
     console.print(table)
 
-def save_to_file(words, filename):
+def save_to_file(words, filename, texts):
     with open(filename, 'w') as f:
         f.write("\n".join(words))
-    console.print(f"[bold green]✓ Saved {len(words)} words to {filename}[/bold green]")
+    console.print(texts["saved_msg"].format(len(words), filename))
 
 def main():
     console.clear()
     console.print(ASCII_ART, style="bold cyan")
-    console.print("[italic yellow]⚠️  Use only for authorized security testing on your own systems.[/italic yellow]\n")
     
-    console.print("[bold yellow]Select attack type:[/bold yellow]")
-    console.print("  1. Social Media")
-    console.print("  2. WiFi")
-    console.print("  3. System")
-    console.print("  4. Mix All (combine all questions)\n")
+    # اختيار اللغة
+    console.print("[bold yellow]اختر اللغة / Choose Language:[/bold yellow]")
+    console.print("  1. العربية")
+    console.print("  2. English\n")
+    lang_choice = Prompt.ask("[bold cyan]Enter your choice / أدخل اختيارك[/bold cyan]", choices=["1", "2"], default="1")
+    
+    if lang_choice == "1":
+        lang = "ar"
+        texts = TEXTS_AR
+        questions_dict = QUESTIONS_AR
+        console.print("[italic yellow]⚠️  استخدم هذه الأداة فقط لاختبار الاختراق الأخلاقي على أجهزتك الخاصة.[/italic yellow]\n")
+    else:
+        lang = "en"
+        texts = TEXTS_EN
+        questions_dict = QUESTIONS_EN
+        console.print("[italic yellow]⚠️  Use only for authorized security testing on your own systems.[/italic yellow]\n")
+    
+    # قائمة أنواع الهجوم مترجمة
+    console.print(f"[bold yellow]{texts['title']}[/bold yellow]")
+    console.print(texts["option_1"])
+    console.print(texts["option_2"])
+    console.print(texts["option_3"])
+    console.print(texts["option_4"] + "\n")
     
     try:
-        choice = Prompt.ask("[bold cyan]Enter your choice[/bold cyan]", choices=["1", "2", "3", "4"], default="1")
+        choice = Prompt.ask(f"[bold cyan]{texts['choice_prompt']}[/bold cyan]", choices=["1", "2", "3", "4"], default="1")
     except KeyboardInterrupt:
         graceful_exit(None, None)
         return
@@ -249,34 +363,33 @@ def main():
     attack_type_map = {"1": "Social Media", "2": "WiFi", "3": "System", "4": "Mix All"}
     attack_type = attack_type_map[choice]
     
-    info = collect_info(attack_type)
+    info = collect_info(attack_type, questions_dict, texts, lang)
     if not info:
-        console.print("[bold red]No information provided. Exiting...[/bold red]")
+        console.print(f"[bold red]{texts['no_info_msg']}[/bold red]")
         return
     
-    console.print(f"\n[green]✓ Collected {len(info)} pieces of information.[/green]")
+    console.print(f"\n[green]{texts['collect_msg'].format(len(info))}[/green]")
     
-    # سؤال المستخدم حول إضافة القائمة الشائعة
-    add_common = Confirm.ask("[yellow]Do you want to add the top 250 most common passwords to the wordlist?[/yellow]", default=False)
+    add_common = Confirm.ask(f"[yellow]{texts['common_passwords_prompt']}[/yellow]", default=False)
     
     raw_words = extract_raw_data(info)
     wordlist = generate_wordlist(raw_words, add_common)
     
     if not wordlist:
-        console.print("[bold red]No words generated.[/bold red]")
+        console.print(f"[bold red]{texts['no_words']}[/bold red]")
         return
     
     display_passwords(wordlist)
     
     try:
-        if Confirm.ask("[yellow]Save wordlist to file?[/yellow]"):
-            filename = Prompt.ask("Enter filename", default="cupid_output.txt")
-            save_to_file(wordlist, filename)
+        if Confirm.ask(f"[yellow]{texts['save_prompt']}[/yellow]"):
+            filename = Prompt.ask(f"[bold cyan]{texts['filename_prompt']}[/bold cyan]", default="cupid_output.txt")
+            save_to_file(wordlist, filename, texts)
     except KeyboardInterrupt:
         graceful_exit(None, None)
         return
     
-    console.print("\n[bold green]Done. Stay ethical![/bold green]")
+    console.print(f"\n[bold green]{texts['done_msg']}[/bold green]")
 
 if __name__ == "__main__":
     main()
